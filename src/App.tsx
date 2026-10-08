@@ -1,4 +1,8 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { messages, numberLocale, type Locale } from "./messages"
+import { eventMapCopy } from "./map/map-copy"
+import { EventMap } from "./map/event-map"
+import { demoBoard } from "./map/demo-board"
 import {
   ArrowRight,
   BarChart3,
@@ -14,6 +18,10 @@ import {
   Menu,
   Minus,
   Monitor,
+  Maximize2,
+  Minimize2,
+  Pause,
+  Play,
   Plus,
   Search,
   Share2,
@@ -22,6 +30,8 @@ import {
   Target,
   Trophy,
   Users,
+  Volume2,
+  VolumeX,
   X,
   Zap,
 } from "lucide-react"
@@ -32,6 +42,11 @@ type Page =
   | "tournament"
   | "leaderboard"
   | "dashboard"
+
+const tutorialVideos: Record<Locale, string> = {
+  pt: "/videos/tutorial-pt.mp4",
+  es: "/videos/tutorial-es.mp4",
+}
 
 const players = [
   { name: "changozebolla", xp: 972, kills: 229, games: 241, tier: "legend" },
@@ -98,24 +113,35 @@ const tierData = {
 
 const tournaments = [
   {
+    slug: "fncs-trio-test",
     title: "FNCS Trio Test",
     status: "EM BREVE",
-    date: "05 de nov., 11:51",
+    dateKey: "trioDate" as const,
     mode: "Trio",
     prize: "",
     image: "/images/fncs-trio-test.png",
     accent: "blue",
+    capacity: 24,
   },
   {
+    slug: "fncs-solo-finals1",
     title: "FNCS Solo Finals1",
     status: "EM BREVE",
-    date: "23 de out., 23:39",
+    dateKey: "soloDate" as const,
     mode: "Solo",
     prize: "",
     image: "",
     accent: "blue",
+    capacity: 16,
   },
 ]
+
+function tournamentFill(slug: string, capacity: number) {
+  const players = demoBoard(slug).teams.reduce((sum, team) => sum + team.names.length, 0)
+  const percent = capacity > 0 ? Math.min(100, Math.round((players / capacity) * 100)) : 0
+  const level = percent >= 70 ? "high" : percent >= 35 ? "mid" : "low"
+  return { players, percent, level }
+}
 
 const proPlayers = [
   ["Nuti", "https://i.ibb.co/4gVnZD4n/nuti.jpg"],
@@ -181,16 +207,27 @@ function FortniteMark() {
 
 function AppHeader({
   page,
+  locale,
+  signedIn,
   onNavigate,
+  onLocale,
+  onLogin,
+  onLogout,
 }: {
   page: Page
+  locale: Locale
+  signedIn: boolean
   onNavigate: (page: Page) => void
+  onLocale: (locale: Locale) => void
+  onLogin: () => void
+  onLogout: () => void
 }) {
   const [open, setOpen] = useState(false)
-  const links: { id: Page label: string }[] = [
-    { id: "tournaments", label: "Torneios" },
-    { id: "leaderboard", label: "Leaderboard" },
-    { id: "dashboard", label: "Dashboard" },
+  const t = messages[locale]
+  const links: { id: Page; label: string }[] = [
+    { id: "tournaments", label: t.navTournaments },
+    { id: "leaderboard", label: t.navLeaderboard },
+    { id: "dashboard", label: t.navDashboard },
   ]
 
   const navigate = (target: Page) => {
@@ -204,11 +241,11 @@ function AppHeader({
         <button
           className="logo-button"
           onClick={() => navigate("home")}
-          aria-label="Ir para o início"
+          aria-label={t.navHome}
         >
           <Logo />
         </button>
-        <nav className="desktop-nav" aria-label="Navegação principal">
+        <nav className="desktop-nav" aria-label={t.navLabel}>
           {links.map((link) => (
             <button
               key={link.id}
@@ -225,33 +262,52 @@ function AppHeader({
           ))}
         </nav>
         <div className="nav-actions">
-          <div className="locale-switcher" aria-label="Idioma">
-            <button className="active" aria-pressed="true">
+          <div className="locale-switcher" aria-label={t.language}>
+            <button
+              className={locale === "pt" ? "active" : ""}
+              aria-pressed={locale === "pt"}
+              onClick={() => onLocale("pt")}
+            >
               <span className="flag flag-br" aria-hidden />
               PT
             </button>
-            <button aria-pressed="false">
+            <button
+              className={locale === "es" ? "active" : ""}
+              aria-pressed={locale === "es"}
+              onClick={() => onLocale("es")}
+            >
               <span className="flag flag-es" aria-hidden />
               ES
             </button>
           </div>
-          <button
-            className="primary-button compact"
-            onClick={() => navigate("dashboard")}
-          >
-            Entrar <ArrowRight size={15} />
-          </button>
+          {signedIn ? (
+            <>
+              <button
+                className="secondary-button compact"
+                onClick={() => navigate("dashboard")}
+              >
+                pardal
+              </button>
+              <button className="secondary-button compact" onClick={onLogout}>
+                {t.logout}
+              </button>
+            </>
+          ) : (
+            <button className="primary-button compact" onClick={onLogin}>
+              {t.login} <ArrowRight size={15} />
+            </button>
+          )}
           <button
             className="menu-button"
             onClick={() => setOpen(!open)}
-            aria-label={open ? "Fechar menu" : "Abrir menu"}
+            aria-label={open ? t.closeMenu : t.openMenu}
           >
             {open ? <X /> : <Menu />}
           </button>
         </div>
       </div>
       {open && (
-        <nav className="mobile-nav" aria-label="Navegação móvel">
+        <nav className="mobile-nav" aria-label={t.navMobile}>
           {links.map((link) => (
             <button
               key={link.id}
@@ -273,6 +329,169 @@ function AppHeader({
   )
 }
 
+function formatClock(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00"
+  const total = Math.floor(seconds)
+  const minutes = Math.floor(total / 60)
+  const remain = total % 60
+  return `${minutes}:${remain.toString().padStart(2, "0")}`
+}
+
+function TutorialPlayer({
+  src,
+  label,
+  locale,
+}: {
+  src: string
+  label: string
+  locale: Locale
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const shellRef = useRef<HTMLDivElement>(null)
+  const lastVolume = useRef(1)
+  const [playing, setPlaying] = useState(false)
+  const [muted, setMuted] = useState(false)
+  const [volume, setVolume] = useState(1)
+  const [time, setTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [fullscreen, setFullscreen] = useState(false)
+  const copy =
+    locale === "es"
+      ? {
+          play: "Reproducir",
+          pause: "Pausar",
+          mute: "Silenciar",
+          sound: "Activar sonido",
+          volume: "Volumen",
+          enter: "Pantalla completa",
+          exit: "Salir de pantalla completa",
+          progress: "Progreso del video",
+        }
+      : {
+          play: "Reproduzir",
+          pause: "Pausar",
+          mute: "Silenciar",
+          sound: "Ativar som",
+          volume: "Volume",
+          enter: "Tela cheia",
+          exit: "Sair da tela cheia",
+          progress: "Progresso do vídeo",
+        }
+
+  useEffect(() => {
+    const onChange = () => setFullscreen(document.fullscreenElement === shellRef.current)
+    document.addEventListener("fullscreenchange", onChange)
+    return () => document.removeEventListener("fullscreenchange", onChange)
+  }, [])
+
+  const togglePlay = () => {
+    const video = videoRef.current
+    if (!video) return
+    if (video.paused) void video.play()
+    else video.pause()
+  }
+
+  const toggleMute = () => {
+    const video = videoRef.current
+    if (!video) return
+    if (video.muted || video.volume === 0) {
+      const next = lastVolume.current || 1
+      video.muted = false
+      video.volume = next
+      setVolume(next)
+      setMuted(false)
+      return
+    }
+    lastVolume.current = video.volume
+    video.muted = true
+    setMuted(true)
+  }
+
+  const changeVolume = (value: number) => {
+    const video = videoRef.current
+    if (!video) return
+    video.volume = value
+    video.muted = value === 0
+    if (value > 0) lastVolume.current = value
+    setVolume(value)
+    setMuted(value === 0)
+  }
+
+  const toggleFullscreen = () => {
+    const shell = shellRef.current
+    if (!shell) return
+    if (document.fullscreenElement) void document.exitFullscreen()
+    else void shell.requestFullscreen()
+  }
+
+  const progress = duration > 0 ? `${(time / duration) * 100}%` : "0%"
+
+  return (
+    <div className="tutorial-player" ref={shellRef}>
+      <video
+        ref={videoRef}
+        className="tutorial-video"
+        playsInline
+        preload="metadata"
+        src={src}
+        aria-label={label}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onTimeUpdate={(event) => setTime(event.currentTarget.currentTime)}
+        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
+        onClick={togglePlay}
+      />
+      {!playing && (
+        <button className="tutorial-center-play" type="button" onClick={togglePlay} aria-label={copy.play}>
+          <Play size={22} fill="currentColor" />
+        </button>
+      )}
+      <div className="tutorial-controls">
+        <button className="tutorial-play" type="button" onClick={togglePlay} aria-label={playing ? copy.pause : copy.play}>
+          {playing ? <Pause size={15} fill="currentColor" /> : <Play size={15} fill="currentColor" />}
+        </button>
+        <span className="tutorial-time">
+          {formatClock(time)}<i>/</i>{formatClock(duration)}
+        </span>
+        <input
+          className="tutorial-range tutorial-scrub"
+          type="range"
+          min={0}
+          max={duration || 0}
+          step={0.1}
+          value={Math.min(time, duration || 0)}
+          aria-label={copy.progress}
+          style={{ ["--progress" as string]: progress }}
+          onChange={(event) => {
+            const video = videoRef.current
+            const next = Number(event.target.value)
+            if (!video) return
+            video.currentTime = next
+            setTime(next)
+          }}
+        />
+        <button type="button" onClick={toggleMute} aria-label={muted ? copy.sound : copy.mute}>
+          {muted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+        </button>
+        <input
+          className="tutorial-range tutorial-volume"
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={muted ? 0 : volume}
+          aria-label={copy.volume}
+          style={{ ["--progress" as string]: `${(muted ? 0 : volume) * 100}%` }}
+          onChange={(event) => changeVolume(Number(event.target.value))}
+        />
+        <button type="button" onClick={toggleFullscreen} aria-label={fullscreen ? copy.exit : copy.enter}>
+          {fullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function SectionTitle({
   eyebrow,
   title,
@@ -291,7 +510,16 @@ function SectionTitle({
   )
 }
 
-function Home({ onNavigate }: { onNavigate: (page: Page) => void }) {
+function Home({
+  onNavigate,
+  onOpenTournament,
+  locale,
+}: {
+  onNavigate: (page: Page) => void
+  onOpenTournament: (slug: string) => void
+  locale: Locale
+}) {
+  const t = messages[locale]
   return (
     <>
       <main>
@@ -300,31 +528,28 @@ function Home({ onNavigate }: { onNavigate: (page: Page) => void }) {
           <div className="hero-grid page-shell">
             <div className="hero-copy reveal">
               <div className="live-label">
-                <span /> BRASIL & LATAM · 24H POR DIA
+                <span /> {t.heroKicker}
               </div>
               <h1>
-                Scrims &<br />
-                customs de elite
+                {t.heroLine1}
                 <br />
-                <span>para Fortnite</span>
+                {t.heroLine2}
                 <br />
-                <span>competitivo</span>
+                <span>{t.heroLine3}</span>
+                <br />
+                <span>{t.heroLine4}</span>
               </h1>
-              <p>
-                A comunidade líder de treinos competitivos no Brasil e LATAM.
-                Partidas equilibradas, regras profissionais e lobby cheio a
-                qualquer hora.
-              </p>
+              <p>{t.heroBody}</p>
               <div className="button-row">
                 <button className="primary-button large live-primary-cta">
                   <DiscordMark className="discord-mark" />
-                  Entrar no Discord
+                  {t.joinDiscord}
                 </button>
                 <button
                   className="secondary-button large live-secondary-cta"
                   onClick={() => onNavigate("leaderboard")}
                 >
-                  Ver leaderboard <ArrowRight size={16} />
+                  {t.viewLeaderboard} <ArrowRight size={16} />
                 </button>
               </div>
             </div>
@@ -335,7 +560,7 @@ function Home({ onNavigate }: { onNavigate: (page: Page) => void }) {
                   TOP 5 <span>·</span> SEASON {liveRanking.season}
                 </h3>
                 <span className="ranking-updated">
-                  atualizado {liveRanking.updatedAt}
+                  {t.updated} {t.rankingUpdatedAt}
                 </span>
               </div>
               <div className="podium" role="list">
@@ -357,7 +582,7 @@ function Home({ onNavigate }: { onNavigate: (page: Page) => void }) {
                       </small>
                     </div>
                     <b>
-                      {player.xp.toLocaleString("pt-BR")}
+                      {player.xp.toLocaleString(numberLocale(locale))}
                       <small> XP</small>
                     </b>
                   </div>
@@ -367,17 +592,17 @@ function Home({ onNavigate }: { onNavigate: (page: Page) => void }) {
                 className="card-link"
                 onClick={() => onNavigate("leaderboard")}
               >
-                <span>Ver ranking completo</span>
+                <span>{t.viewFullRanking}</span>
                 <ArrowRight size={16} />
               </button>
             </div>
           </div>
           <div className="stats-bar page-shell">
             {[
-              ["70k+", "membros no Discord"],
-              ["20.039", "ranqueados na Season 3"],
-              ["6.000+", "players únicos por dia"],
-              ["8.000+", "partidas por mês"],
+              ["70k+", t.statMembers],
+              ["20.039", t.statRanked],
+              ["6.000+", t.statDaily],
+              ["8.000+", t.statMatches],
             ].map(([number, label]) => (
               <div className="hero-stat" key={label}>
                 <strong>{number}</strong>
@@ -390,15 +615,15 @@ function Home({ onNavigate }: { onNavigate: (page: Page) => void }) {
         <section className="live-tournaments-section section page-shell">
           <div>
             <SectionTitle
-              eyebrow="TORNEIOS"
-              title="Campeonatos com mapa de queda"
-              body="Classificou? Entre com o Discord e marque o spot da sua equipe direto no mapa — sem planilha, sem print no chat."
+              eyebrow={t.tournamentsEyebrow}
+              title={t.tournamentsTitle}
+              body={t.tournamentsBody}
             />
             <button
               className="live-section-link"
               onClick={() => onNavigate("tournaments")}
             >
-              Ver todos os torneios <ArrowRight size={16} />
+              {t.viewAllTournaments} <ArrowRight size={16} />
             </button>
           </div>
           <div className="live-event-list">
@@ -406,15 +631,15 @@ function Home({ onNavigate }: { onNavigate: (page: Page) => void }) {
               <button
                 className="live-event-row"
                 key={event.title}
-                onClick={() => onNavigate("tournament")}
+                onClick={() => onOpenTournament(event.slug)}
               >
                 <span className="live-event-thumb">
                   {event.image && <img src={event.image} alt="" />}
                 </span>
                 <span className="live-event-copy">
                   <span className="live-event-kicker">
-                    <small>{event.status}</small>
-                    <em>{event.date}</em>
+                    <small>{t.statusSoon}</small>
+                    <em>{t[event.dateKey]}</em>
                   </span>
                   <strong>{event.title}</strong>
                   <span className="live-event-meta">
@@ -422,7 +647,7 @@ function Home({ onNavigate }: { onNavigate: (page: Page) => void }) {
                   </span>
                 </span>
                 <span className="live-event-status">
-                  <small>VER MAPA</small>
+                  <small>{t.viewMap}</small>
                   <ArrowRight size={17} />
                 </span>
               </button>
@@ -434,17 +659,17 @@ function Home({ onNavigate }: { onNavigate: (page: Page) => void }) {
           <div className="page-shell live-rank-layout">
             <div className="live-rank-copy">
               <SectionTitle
-                eyebrow="LEADERBOARD"
-                title="Cada partida conta para o seu cargo"
-                body="Pontos das scrims viram posição na tabela, e os 2.000 primeiros levam cargo no Discord — do Bronze ao Legend."
+                eyebrow={t.navLeaderboard.toUpperCase()}
+                title={t.rankTitle}
+                body={t.rankBody}
               />
               <div className="rank-heading-actions">
-                <span>A tabela atualiza todo dia às 03h.</span>
+                <span>{t.rankRefresh}</span>
                 <button
                   className="secondary-button"
                   onClick={() => onNavigate("leaderboard")}
                 >
-                  Ver leaderboard <ArrowRight size={16} />
+                  {t.viewLeaderboard} <ArrowRight size={16} />
                 </button>
               </div>
             </div>
@@ -475,25 +700,25 @@ function Home({ onNavigate }: { onNavigate: (page: Page) => void }) {
         <section className="page-shell live-community-section">
           <div className="live-partners">
             <div>
-              <span className="eyebrow">PARCERIAS</span>
-              <h2>Marcas que confiaram na Major</h2>
+              <span className="eyebrow">{t.partnersEyebrow}</span>
+              <h2>{t.partnersTitle}</h2>
             </div>
             <div className="partner-rotation">
               <button className="partner-card twitch-card">
                 <span className="partner-mark twitch"><TwitchMark /></span>
                 <span className="partner-copy">
-                  <small>PARCEIRO OFICIAL</small>
+                  <small>{t.officialPartner}</small>
                   <b>Twitch</b>
-                  <em>Torneios impulsionados pela Twitch.</em>
+                  <em>{t.twitchBlurb}</em>
                 </span>
                 <span className="partner-number">01</span>
               </button>
               <button className="partner-card fortnite-card">
                 <span className="partner-mark fortnite"><FortniteMark /></span>
                 <span className="partner-copy">
-                  <small>PARCEIRO OFICIAL</small>
+                  <small>{t.officialPartner}</small>
                   <b>Fortnite</b>
-                  <em>Torneios com prêmios oficiais do Fortnite.</em>
+                  <em>{t.fortniteBlurb}</em>
                 </span>
                 <span className="partner-number">02</span>
               </button>
@@ -501,15 +726,15 @@ function Home({ onNavigate }: { onNavigate: (page: Page) => void }) {
           </div>
 
           <div className="live-pros">
-            <span className="eyebrow">COMUNIDADE PRO</span>
-            <h2>Quem treina na Major</h2>
-            <p>Jogadores profissionais escolhem os nossos servidores.</p>
+            <span className="eyebrow">{t.prosEyebrow}</span>
+            <h2>{t.prosTitle}</h2>
+            <p>{t.prosBody}</p>
             <div className="pro-marquee-wrap">
               <div className="pro-marquee">
                 {[...proPlayers, ...proPlayers].map(([name, image], index) => (
                   <figure key={`${name}-${index}`} aria-hidden={index >= proPlayers.length || undefined}>
                     <img src={image} alt={index < proPlayers.length ? name : ""} />
-                    <figcaption><b>{name}</b><small>PRO PLAYER</small></figcaption>
+                    <figcaption><b>{name}</b><small>{t.proPlayer}</small></figcaption>
                   </figure>
                 ))}
               </div>
@@ -518,20 +743,30 @@ function Home({ onNavigate }: { onNavigate: (page: Page) => void }) {
         </section>
 
         <section className="live-invite-section">
+          <div className="page-shell tutorial-block">
+            <div className="tutorial-copy">
+              <span className="tutorial-eyebrow">{t.tutorialEyebrow}</span>
+              <h2>{t.tutorialTitle}</h2>
+              <p>{t.tutorialCopy}</p>
+            </div>
+            <TutorialPlayer
+              key={locale}
+              src={tutorialVideos[locale]}
+              label={t.tutorialLabel}
+              locale={locale}
+            />
+          </div>
           <div className="page-shell live-invite-card">
             <div>
-              <h2>Pronto para evoluir?</h2>
-              <p>
-                Entre no Discord da Major Scrims e comece a treinar com os
-                melhores do Brasil e LATAM hoje mesmo.
-              </p>
+              <h2>{t.inviteTitle}</h2>
+              <p>{t.inviteBody}</p>
             </div>
             <div>
               <button className="primary-button large">
                 <DiscordMark className="discord-mark" />
-                Entrar no Discord
+                {t.joinDiscord}
               </button>
-              <button>Marca ou organização? Fale com a gente</button>
+              <button>{t.inviteContact}</button>
             </div>
           </div>
         </section>
@@ -540,13 +775,22 @@ function Home({ onNavigate }: { onNavigate: (page: Page) => void }) {
   )
 }
 
-function Tournaments({ onNavigate }: { onNavigate: (page: Page) => void }) {
+function Tournaments({
+  onNavigate,
+  onOpenTournament,
+  locale,
+}: {
+  onNavigate: (page: Page) => void
+  onOpenTournament: (slug: string) => void
+  locale: Locale
+}) {
+  const t = messages[locale]
   return (
     <main className="inner-page live-listing-page">
       <section className="page-shell live-page-heading">
-        <span className="eyebrow">// TORNEIOS</span>
-        <h1>Torneios oficiais</h1>
-        <p>Acompanhe os campeonatos e marque o seu spot no mapa de queda.</p>
+        <span className="eyebrow">{t.tournamentsPageEyebrow}</span>
+        <h1>{t.tournamentsPageTitle}</h1>
+        <p>{t.tournamentsPageBody}</p>
       </section>
 
       <section className="page-shell live-tournament-grid">
@@ -554,19 +798,40 @@ function Tournaments({ onNavigate }: { onNavigate: (page: Page) => void }) {
           <button
             className="live-tournament-card"
             key={event.title}
-            onClick={() => onNavigate("tournament")}
+            onClick={() => onOpenTournament(event.slug)}
           >
             <span className="live-tournament-art">
               {event.image && <img src={event.image} alt="" />}
-              <small>{event.status}</small>
+              <small>{t.statusSoon}</small>
             </span>
             <span className="live-tournament-body">
-              <strong>{event.title}</strong>
-              <span>
-                <small>{event.mode}</small>
-                <small>Build</small>
-                <small>BR</small>
-              </span>
+              {(() => {
+                const fill = tournamentFill(event.slug, event.capacity)
+                return (
+                  <>
+                    <span className="live-tournament-title-row">
+                      <strong>{event.title}</strong>
+                      <span className="occupancy-track" aria-hidden>
+                        <span
+                          className={`occupancy-fill ${fill.level}`}
+                          style={{ width: `${fill.percent}%` }}
+                        />
+                      </span>
+                    </span>
+                    <span>
+                      <small>{event.mode}</small>
+                      <small>Build</small>
+                      <small>BR</small>
+                    </span>
+                    <span className="occupancy-meta">
+                      <span>
+                        {fill.players}/{event.capacity} {t.occupancyPlayers}
+                      </span>
+                      <b>{fill.percent}%</b>
+                    </span>
+                  </>
+                )
+              })()}
             </span>
           </button>
         ))}
@@ -575,50 +840,25 @@ function Tournaments({ onNavigate }: { onNavigate: (page: Page) => void }) {
   )
 }
 
-const eventPlayers = [
-  "pardal",
-  "RodryGØD.",
-  "7RX matibuca.",
-  "LuLuzito Ӝ",
-  "7tzin",
-  "Lynex bettifn",
-  "20COMER70CORRER!",
-  "Nicksreyn",
-  "golden",
-  "JAC-roblox",
-  "patrick-jane-_-",
-  "vicoouk do bronx",
-]
-
-const mapZones = [
-  { name: "NhouLM10", x: "66%", y: "20%", state: "taken" },
-  { name: "pardal · Fliks7.", x: "58%", y: "48%", state: "contested" },
-  { name: "RodryGØD.", x: "72%", y: "48%", state: "taken" },
-  { name: "7tzin", x: "49%", y: "67%", state: "taken" },
-  { name: "Lynex bettifn", x: "61%", y: "72%", state: "contested" },
-  { name: "Nicksreyn", x: "62%", y: "82%", state: "taken" },
-  { name: "20COMER70CORRER!", x: "43%", y: "77%", state: "taken" },
-  { name: "LuLuzito Ӝ · Ment0s", x: "31%", y: "65%", state: "contested" },
-  { name: "7RX matibuca.", x: "42%", y: "63%", state: "selected" },
-  { name: "vicoouk do bronx", x: "25%", y: "52%", state: "taken" },
-] as const
-
 function TournamentDetail({
+  slug,
   onNavigate,
+  locale,
+  signedIn,
+  onLogin,
 }: {
+  slug: string
   onNavigate: (page: Page) => void
+  locale: Locale
+  signedIn: boolean
+  onLogin: () => void
 }) {
-  const [query, setQuery] = useState("")
-  const [unmarked, setUnmarked] = useState(false)
-  const [mapScale, setMapScale] = useState(1)
-  const visiblePlayers = eventPlayers.filter((name) =>
-    name.toLowerCase().includes(query.toLowerCase()),
-  )
-  const changeMapZoom = (amount: number) => {
-    setMapScale((current) =>
-      Math.min(4, Math.max(1, Math.round((current + amount) * 100) / 100)),
-    )
-  }
+  const t = messages[locale]
+  const mapCopy = eventMapCopy(locale)
+  const event = tournaments.find((item) => item.slug === slug) ?? tournaments[0]
+  const board = demoBoard(event.slug)
+  const [comments, setComments] = useState<string[]>([])
+  const [draft, setDraft] = useState("")
 
   return (
     <main className="event-page">
@@ -628,117 +868,85 @@ function TournamentDetail({
             className="event-back"
             onClick={() => onNavigate("tournaments")}
           >
-            ← Torneios
+            {t.backTournaments}
           </button>
-          <h1>FNCS Solo Finals1</h1>
+          <h1>{event.title}</h1>
           <div className="event-meta-line">
-            <span>23 de outubro a 24 de outubro de 2026 (BRT)</span>
-            <i>·</i><span>Solo</span><i>·</i><span>Build</span><i>·</i>
-            <span>BR</span><small>Em breve</small>
+            <span>{t[event.dateKey]}</span>
+            <i>·</i><span>{event.mode}</span><i>·</i><span>Build</span><i>·</i>
+            <span>BR</span><small>{t.statusSoonSoft}</small>
           </div>
         </div>
       </header>
 
       <div className="event-phase-bar">
         <button className="active">Finals</button>
-        <span><i /> Fecha em <b>16d 06h</b></span>
+        <span><i /> {t.closesIn} <b>16d 06h</b></span>
       </div>
 
       <section className="event-wide-shell event-workspace">
-        <div className="event-toolbar">
-          <button><Share2 size={16} /> Compartilhar</button>
-          <span><Users size={18} /><b>16/101</b> jogadores marcados</span>
-        </div>
-
-        <div className="event-map-layout">
-          <aside className="event-team-panel">
-            <div className="team-panel-head">
-              <span><b>Equipes</b><small>16/101 com spot</small></span>
-              <div>
-                <label>
-                  <Search size={15} />
-                  <input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Buscar jogador"
-                  />
-                </label>
-                <button
-                  className={unmarked ? "active" : ""}
-                  onClick={() => setUnmarked(!unmarked)}
-                >
-                  Sem spot
-                </button>
-              </div>
-            </div>
-            <div className="team-list">
-              {visiblePlayers.map((name, index) => (
-                <button key={name}>
-                  <span className="marked-check"><Check size={13} /></span>
-                  <b>{name}</b>
-                  {(index === 1 || index === 3) && <small>◆</small>}
-                </button>
-              ))}
-            </div>
-            <p>
-              Você está vendo o mapa em modo leitura. Entre com o Discord para
-              marcar o spot da sua equipe.
-            </p>
-          </aside>
-
-          <div
-            className="event-map-canvas"
-            onWheel={(event) => {
-              event.preventDefault()
-              changeMapZoom(event.deltaY < 0 ? 0.25 : -0.25)
-            }}
-          >
-            <div className="map-deadline">Marcações até 23/10, 23:39</div>
-            <div
-              className="event-map-zoom-layer"
-              style={{ transform: `scale(${mapScale})` }}
-            >
-              {/* Placeholder raster: substituir pelo mapa vetorial na integração final. */}
-              <img src="/images/fncs-solo-map.png" alt="Mapa do evento" />
-              <div className="map-zone-layer">
-                {mapZones.map((zone) => (
-                  <button
-                    key={zone.name}
-                    className={`prototype-zone ${zone.state}`}
-                    style={{ left: zone.x, top: zone.y }}
-                    aria-label={`${zone.name}, spot ${zone.state}`}
-                  >
-                    {zone.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="map-controls">
-              <button aria-label="Modo transmissão"><Monitor /></button>
-              <button aria-label="Ocultar nomes"><Eye /></button>
-              <button
-                aria-label="Aumentar zoom"
-                disabled={mapScale >= 4}
-                onClick={() => changeMapZoom(0.5)}
-              >
-                <Plus />
-              </button>
-              <button
-                aria-label="Diminuir zoom"
-                disabled={mapScale <= 1}
-                onClick={() => changeMapZoom(-0.5)}
-              >
-                <Minus />
-              </button>
-            </div>
-            <div className="map-brand"><Logo /><b>MAJORSCRIMS.COM</b></div>
-          </div>
-        </div>
+        <EventMap
+          key={`${event.slug}-${signedIn ? "signed-in" : "anon"}`}
+          t={mapCopy}
+          slug={event.slug}
+          windowId="finals"
+          mapImage="/images/mapa-br.png"
+          zones={board.zones}
+          teams={board.teams}
+          myKey={signedIn ? board.viewerKey : null}
+          canMark={signedIn}
+          isStaff={signedIn}
+          blockedReason={signedIn ? null : mapCopy.blockAnon}
+          highlights={board.highlights}
+          closesAt={board.closesAt}
+          closed={false}
+        />
       </section>
 
       <section className="event-wide-shell event-comments">
-        <div><h2>Comentários</h2><span>0</span></div>
-        <p>Nenhum comentário ainda.</p>
+        <div><h2>{t.comments}</h2><span>{comments.length}</span></div>
+        {signedIn ? (
+          <form
+            className="comment-form"
+            onSubmit={(event) => {
+              event.preventDefault()
+              const body = draft.trim()
+              if (!body) return
+              setComments((current) => [body, ...current])
+              setDraft("")
+            }}
+          >
+            <textarea
+              value={draft}
+              maxLength={500}
+              rows={3}
+              placeholder={t.commentPlaceholder}
+              onChange={(event) => setDraft(event.target.value)}
+            />
+            <button className="primary-button" type="submit" disabled={draft.trim().length === 0}>
+              {t.commentSend}
+            </button>
+          </form>
+        ) : (
+          <p>
+            <button type="button" className="comment-login" onClick={onLogin}>
+              {t.login}
+            </button>{" "}
+            {t.commentLogin}
+          </p>
+        )}
+        {comments.length === 0 ? (
+          <p>{t.noComments}</p>
+        ) : (
+          <ul className="comment-list">
+            {comments.map((body, index) => (
+              <li key={`${index}-${body}`}>
+                <b>pardal</b>
+                <span>{body}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </main>
   )
@@ -754,7 +962,8 @@ const tierRanges = [
   { key: "bronze", range: "1501–2000" },
 ] as const
 
-function Leaderboard() {
+function Leaderboard({ locale }: { locale: Locale }) {
+  const t = messages[locale]
   const [query, setQuery] = useState("")
   const [season, setSeason] = useState("S3")
   const filtered = useMemo(
@@ -769,17 +978,17 @@ function Leaderboard() {
     <main className="inner-page live-leaderboard-page">
       <section className="page-shell live-board-header">
         <div>
-          <span className="eyebrow">// LEADERBOARD</span>
+          <span className="eyebrow">// {t.navLeaderboard.toUpperCase()}</span>
           <h1>Season 3</h1>
           <p>
-            RANKING INDIVIDUAL <span>·</span> 20.039 JOGADORES{" "}
-            <span>·</span> <em>atualizado 07/10/2026, 06:01</em>
+            {t.individualRanking} <span>·</span> 20.039 {t.playersWord}{" "}
+            <span>·</span> <em>{t.leaderboardUpdated}</em>
           </p>
         </div>
         <div
           className="season-picker"
           role="group"
-          aria-label="Selecionar season"
+          aria-label={t.selectSeason}
         >
           {["S1", "S2", "S3"].map((item) => (
             <button
@@ -788,7 +997,7 @@ function Leaderboard() {
               key={item}
             >
               {item}
-              <small>{item === "S3" ? "ATUAL" : "FINAL"}</small>
+              <small>{item === "S3" ? t.seasonCurrent : t.seasonFinal}</small>
             </button>
           ))}
         </div>
@@ -796,7 +1005,7 @@ function Leaderboard() {
 
       <section className="page-shell live-board-content">
         <div className="live-tier-section">
-          <span>CARGOS</span>
+          <span>{t.roles}</span>
           <div className="live-tier-grid">
             {tierRanges.map(({ key, range }) => {
               const tier = tierData[key]
@@ -818,16 +1027,16 @@ function Leaderboard() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar jogador..."
-            aria-label="Buscar jogador"
+            placeholder={t.searchPlayerDots}
+            aria-label={t.searchPlayer}
           />
         </label>
 
         <div className="leaderboard-table live-table">
           <div className="table-head">
-            <span>RANK</span>
-            <span>NICKNAME</span>
-            <span>CARGO</span>
+            <span>{t.colRank}</span>
+            <span>{t.colNickname}</span>
+            <span>{t.colRole}</span>
             <span>XP</span>
             <span>KILLS</span>
             <span>GAMES</span>
@@ -851,14 +1060,14 @@ function Leaderboard() {
                 <span className="tier-cell" style={{ color: tier.color }}>
                   MS {tier.label}
                 </span>
-                <strong>{player.xp.toLocaleString("pt-BR")}</strong>
+                <strong>{player.xp.toLocaleString(numberLocale(locale))}</strong>
                 <span>{player.kills}</span>
                 <span>{player.games}</span>
               </div>
             )
           })}
           {filtered.length === 0 && (
-            <div className="empty-state">Nenhum jogador encontrado.</div>
+            <div className="empty-state">{t.noPlayer}</div>
           )}
         </div>
       </section>
@@ -866,7 +1075,8 @@ function Leaderboard() {
   )
 }
 
-function Dashboard() {
+function Dashboard({ locale }: { locale: Locale }) {
+  const t = messages[locale]
   return (
     <main className="inner-page dashboard-page">
       <section className="dashboard-head page-shell">
@@ -878,28 +1088,28 @@ function Dashboard() {
             </span>
           </span>
           <div>
-            <small>SEASON 3 · AO VIVO</small>
+            <small>SEASON 3 · {t.live}</small>
             <h1>
-              Olá, <span>CaduFPS</span>
+              {t.hello} <span>CaduFPS</span>
             </h1>
-            <p>Acompanhe sua evolução na Major.</p>
+            <p>{t.dashSubtitle}</p>
           </div>
         </div>
         <button className="secondary-button">
-          <CircleUserRound size={18} /> Ver perfil público
+          <CircleUserRound size={18} /> {t.publicProfile}
         </button>
       </section>
       <section className="page-shell dashboard-grid">
         <div className="dashboard-main">
           <div className="rank-overview">
             <div className="rank-summary">
-              <span className="overline">SUA POSIÇÃO</span>
+              <span className="overline">{t.yourPosition}</span>
               <div className="big-rank">
                 <small>#</small>148
               </div>
-              <span className="rank-change">↑ 12 posições esta semana</span>
+              <span className="rank-change">{t.weekChange}</span>
               <p>
-                TOP 0,8% <span>de 18.420 jogadores</span>
+                TOP 0,8% <span>{t.ofPlayers}</span>
               </p>
             </div>
             <div className="current-tier">
@@ -907,10 +1117,10 @@ function Dashboard() {
                 <img src="/images/rank-icons/master.png" alt="Master" />
               </span>
               <div>
-                <small>CARGO ATUAL</small>
+                <small>{t.currentRole}</small>
                 <h3>Master</h3>
                 <p>
-                  Faltam <b>1.240 XP</b> para Grandmaster
+                  {t.xpMissing} <b>1.240 XP</b> {t.xpMissingEnd}
                 </p>
               </div>
             </div>
@@ -920,10 +1130,10 @@ function Dashboard() {
           </div>
           <div className="metric-grid">
             {[
-              [BarChart3, "PONTOS", "24.340", "+2.180 esta semana"],
-              [Gamepad2, "PARTIDAS", "109", "76% presença"],
-              [Crosshair, "KILLS", "372", "3,4 por partida"],
-              [Trophy, "VITÓRIAS", "18", "16,5% win rate"],
+              [BarChart3, t.metricPoints, "24.340", t.metricPointsDetail],
+              [Gamepad2, t.metricMatches, "109", t.metricMatchesDetail],
+              [Crosshair, "KILLS", "372", t.metricKillsDetail],
+              [Trophy, t.metricWins, "18", t.metricWinsDetail],
             ].map(([Icon, label, value, detail]) => {
               const MetricIcon = Icon as typeof BarChart3
               return (
@@ -940,9 +1150,9 @@ function Dashboard() {
             <div className="card-title">
               <span>
                 <BarChart3 size={19} />
-                <b>DESEMPENHO RECENTE</b>
+                <b>{t.recentPerformance}</b>
               </span>
-              <small>ÚLTIMOS 7 DIAS</small>
+              <small>{t.last7}</small>
             </div>
             <div className="chart">
               {[35, 48, 42, 60, 54, 76, 88].map((height, index) => (
@@ -952,7 +1162,7 @@ function Dashboard() {
               ))}
             </div>
             <div className="chart-labels">
-              {["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"].map((day) => (
+              {t.weekdays.map((day) => (
                 <span key={day}>{day}</span>
               ))}
             </div>
@@ -963,14 +1173,14 @@ function Dashboard() {
             <span className="daily-icon">
               <Zap fill="currentColor" />
             </span>
-            <span className="overline">MISSÃO DA SEMANA</span>
-            <h3>Consistência é tudo.</h3>
-            <p>Jogue 5 partidas nesta semana para manter sua sequência.</p>
+            <span className="overline">{t.weeklyMission}</span>
+            <h3>{t.missionTitle}</h3>
+            <p>{t.missionBody}</p>
             <div className="mission-progress">
               <span style={{ width: "60%" }} />
             </div>
             <div className="mission-count">
-              <b>3 / 5 partidas</b>
+              <b>{t.missionCount}</b>
               <span>60%</span>
             </div>
           </div>
@@ -978,7 +1188,7 @@ function Dashboard() {
             <div className="card-title">
               <span>
                 <LockKeyhole size={18} />
-                <b>CONTA VINCULADA</b>
+                <b>{t.linkedAccount}</b>
               </span>
             </div>
             <div className="discord-account">
@@ -986,17 +1196,14 @@ function Dashboard() {
               <div>
                 <b>@cadufps</b>
                 <small>
-                  <i /> Discord verificado
+                  <i /> {t.discordVerified}
                 </small>
               </div>
             </div>
-            <p>
-              Seus dados são sincronizados automaticamente com a tabela da
-              Major.
-            </p>
+            <p>{t.syncNote}</p>
           </div>
           <button className="primary-button full">
-            <LayoutDashboard size={17} /> Ver na leaderboard
+            <LayoutDashboard size={17} /> {t.viewOnLeaderboard}
           </button>
         </aside>
       </section>
@@ -1004,25 +1211,26 @@ function Dashboard() {
   )
 }
 
-function Footer({ onNavigate: _onNavigate }: { onNavigate: (page: Page) => void }) {
+function Footer({ locale }: { locale: Locale }) {
+  const t = messages[locale]
   return (
     <footer>
       <div className="page-shell live-footer-main">
         <div className="live-footer-founders">
           <Logo />
-          <b>FUNDADORES</b>
+          <b>{t.founders}</b>
           <div>
             <span><i>B</i><strong>@BLXCKOUTZ<small>Co-owner · BR</small></strong></span>
             <span><i>G</i><strong>@GORILONFN<small>Co-owner · AR</small></strong></span>
           </div>
         </div>
         <div className="live-footer-contact">
-          <button>Fale conosco <ArrowRight size={14} /></button>
+          <button>{t.contact} <ArrowRight size={14} /></button>
           <div className="live-socials">
             <span>X</span><span>IG</span><span>TK</span><span>DS</span>
           </div>
-          <div><span>Política de Privacidade</span><span>Termos de Uso</span></div>
-          <small>© 2026 Major Scrims. Todos os direitos reservados.</small>
+          <div><span>{t.privacy}</span><span>{t.terms}</span></div>
+          <small>{t.rights}</small>
         </div>
       </div>
     </footer>
@@ -1031,20 +1239,51 @@ function Footer({ onNavigate: _onNavigate }: { onNavigate: (page: Page) => void 
 
 export default function App() {
   const [page, setPage] = useState<Page>("home")
+  const [locale, setLocale] = useState<Locale>("pt")
+  const [signedIn, setSignedIn] = useState(false)
+  const [eventSlug, setEventSlug] = useState("fncs-solo-finals1")
   const navigate = (target: Page) => {
     setPage(target)
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
+  const openTournament = (slug: string) => {
+    setEventSlug(slug)
+    navigate("tournament")
+  }
+
+  useEffect(() => {
+    document.documentElement.lang = locale === "es" ? "es" : "pt-BR"
+  }, [locale])
 
   return (
     <div className="app">
-      <AppHeader page={page} onNavigate={navigate} />
-      {page === "home" && <Home onNavigate={navigate} />}
-      {page === "tournaments" && <Tournaments onNavigate={navigate} />}
-      {page === "tournament" && <TournamentDetail onNavigate={navigate} />}
-      {page === "leaderboard" && <Leaderboard />}
-      {page === "dashboard" && <Dashboard />}
-      <Footer onNavigate={navigate} />
+      <AppHeader
+        page={page}
+        locale={locale}
+        signedIn={signedIn}
+        onNavigate={navigate}
+        onLocale={setLocale}
+        onLogin={() => setSignedIn(true)}
+        onLogout={() => setSignedIn(false)}
+      />
+      {page === "home" && (
+        <Home onNavigate={navigate} onOpenTournament={openTournament} locale={locale} />
+      )}
+      {page === "tournaments" && (
+        <Tournaments onNavigate={navigate} onOpenTournament={openTournament} locale={locale} />
+      )}
+      {page === "tournament" && (
+        <TournamentDetail
+          slug={eventSlug}
+          onNavigate={navigate}
+          locale={locale}
+          signedIn={signedIn}
+          onLogin={() => setSignedIn(true)}
+        />
+      )}
+      {page === "leaderboard" && <Leaderboard locale={locale} />}
+      {page === "dashboard" && <Dashboard locale={locale} />}
+      <Footer locale={locale} />
     </div>
   )
 }
