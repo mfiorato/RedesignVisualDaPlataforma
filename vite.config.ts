@@ -1,4 +1,5 @@
 import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite'
+import { handle as handleLiveTournaments } from './server/live-tournaments'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
@@ -21,6 +22,7 @@ export default defineConfig(({ mode }) => {
 react(),
       tailwindcss(),
       figmaSiteConfiguration(siteConfiguration),
+      liveTournamentsApi(),
       figmaErrorOverlayReplay(),
       figmaReactRefreshBoundaryFallback(),
       figmaMakeKitPlugin({ storiesGlob: '/src/**/*.stories.{ts,tsx,js,jsx}' }),
@@ -47,6 +49,30 @@ react(),
     },
   }
 })
+
+function liveTournamentsApi(): Plugin {
+  return {
+    name: 'live-tournaments-api',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const url = req.url?.split('?')[0] ?? ''
+        if (url !== '/api/tournaments' && !url.startsWith('/api/tournaments/')) return next()
+        try {
+          const result = await handleLiveTournaments(url)
+          res.statusCode = result.status
+          res.setHeader('Content-Type', 'application/json; charset=utf-8')
+          res.end(JSON.stringify(result.body))
+        } catch (error) {
+          console.error('[tournaments]', error instanceof Error ? error.message : error)
+          res.statusCode = 500
+          res.setHeader('Content-Type', 'application/json; charset=utf-8')
+          res.end(JSON.stringify({ error: 'unavailable' }))
+        }
+      })
+    },
+  }
+}
 
 type FigmaSiteConfiguration = {
   title?: string
