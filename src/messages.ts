@@ -62,6 +62,7 @@ const pt = {
   tournamentsPageTitle: "Torneios oficiais",
   tournamentsPageBody:
     "Acompanhe os campeonatos e marque o seu spot no mapa de queda.",
+  occupancyPlayers: "jogadores",
   backTournaments: "← Torneios",
   eventDates: "23 de outubro a 24 de outubro de 2026 (BRT)",
   closesIn: "Fecha em",
@@ -199,6 +200,7 @@ const es: typeof pt = {
   tournamentsPageTitle: "Torneos oficiales",
   tournamentsPageBody:
     "Sigue los campeonatos y marca tu spot en el mapa de drop.",
+  occupancyPlayers: "jugadores",
   backTournaments: "← Torneos",
   eventDates: "23 de octubre a 24 de octubre de 2026 (BRT)",
   closesIn: "Cierra en",

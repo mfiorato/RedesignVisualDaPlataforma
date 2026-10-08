@@ -121,6 +121,7 @@ const tournaments = [
     prize: "",
     image: "/images/fncs-trio-test.png",
     accent: "blue",
+    capacity: 24,
   },
   {
     slug: "fncs-solo-finals1",
@@ -131,8 +132,16 @@ const tournaments = [
     prize: "",
     image: "",
     accent: "blue",
+    capacity: 16,
   },
 ]
+
+function tournamentFill(slug: string, capacity: number) {
+  const players = demoBoard(slug).teams.reduce((sum, team) => sum + team.names.length, 0)
+  const percent = capacity > 0 ? Math.min(100, Math.round((players / capacity) * 100)) : 0
+  const level = percent >= 70 ? "high" : percent >= 35 ? "mid" : "low"
+  return { players, percent, level }
+}
 
 const proPlayers = [
   ["Nuti", "https://i.ibb.co/4gVnZD4n/nuti.jpg"],
@@ -796,12 +805,33 @@ function Tournaments({
               <small>{t.statusSoon}</small>
             </span>
             <span className="live-tournament-body">
-              <strong>{event.title}</strong>
-              <span>
-                <small>{event.mode}</small>
-                <small>Build</small>
-                <small>BR</small>
-              </span>
+              {(() => {
+                const fill = tournamentFill(event.slug, event.capacity)
+                return (
+                  <>
+                    <span className="live-tournament-title-row">
+                      <strong>{event.title}</strong>
+                      <span className="occupancy-track" aria-hidden>
+                        <span
+                          className={`occupancy-fill ${fill.level}`}
+                          style={{ width: `${fill.percent}%` }}
+                        />
+                      </span>
+                    </span>
+                    <span>
+                      <small>{event.mode}</small>
+                      <small>Build</small>
+                      <small>BR</small>
+                    </span>
+                    <span className="occupancy-meta">
+                      <span>
+                        {fill.players}/{event.capacity} {t.occupancyPlayers}
+                      </span>
+                      <b>{fill.percent}%</b>
+                    </span>
+                  </>
+                )
+              })()}
             </span>
           </button>
         ))}
