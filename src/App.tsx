@@ -3,6 +3,7 @@ import { messages, numberLocale, type Locale } from "./messages"
 import { eventMapCopy } from "./map/map-copy"
 import { EventMap } from "./map/event-map"
 import { demoBoard } from "./map/demo-board"
+import type { PlainTeam, PlainZone } from "./map/map-types"
 import {
   ArrowRight,
   BarChart3,
@@ -42,6 +43,8 @@ type Page =
   | "tournament"
   | "leaderboard"
   | "dashboard"
+
+const DISCORD_INVITE = "https://discord.com/invite/WN7dfDf5Fw"
 
 const tutorialVideos: Record<Locale, string> = {
   pt: "/videos/tutorial-pt.mp4",
@@ -141,6 +144,89 @@ function tournamentFill(slug: string, capacity: number) {
   const percent = capacity > 0 ? Math.min(100, Math.round((players / capacity) * 100)) : 0
   const level = percent >= 70 ? "high" : percent >= 35 ? "mid" : "low"
   return { players, percent, level }
+}
+
+type TournamentStatus = "upcoming" | "live" | "completed"
+
+type CatalogEvent = {
+  slug: string
+  title: string
+  status: TournamentStatus
+  mode: string
+  teamSize: string
+  region: string
+  image: string
+  start: string | null
+  marked: number
+  roster: number
+  source: "mock" | "database"
+  dateKey?: "trioDate" | "soloDate"
+}
+
+type LiveWindow = {
+  id: string
+  label: string
+  closesAt: string | null
+  closed: boolean
+  zones: PlainZone[]
+  teams: PlainTeam[]
+}
+
+function mockCatalog(): CatalogEvent[] {
+  return tournaments.map((event) => {
+    const fill = tournamentFill(event.slug, event.capacity)
+    return {
+      slug: event.slug,
+      title: event.title,
+      status: "upcoming",
+      mode: "Build",
+      teamSize: event.mode,
+      region: "BR",
+      image: event.image,
+      start: null,
+      marked: fill.players,
+      roster: event.capacity,
+      source: "mock",
+      dateKey: event.dateKey,
+    }
+  })
+}
+
+function occupancy(event: CatalogEvent) {
+  const percent = event.roster > 0 ? Math.min(100, Math.round((event.marked / event.roster) * 100)) : 0
+  const level = percent >= 70 ? "high" : percent >= 35 ? "mid" : "low"
+  return { percent, level }
+}
+
+function statusLabel(
+  status: TournamentStatus,
+  t: (typeof messages)["pt"],
+  soft = false,
+) {
+  if (status === "live") return soft ? t.statusLiveSoft : t.statusLive
+  if (status === "completed") return soft ? t.statusCompletedSoft : t.statusCompleted
+  return soft ? t.statusUpcomingSoft : t.statusUpcoming
+}
+
+function eventDate(event: CatalogEvent, t: (typeof messages)["pt"], locale: Locale) {
+  if (event.dateKey) return t[event.dateKey]
+  if (!event.start) return ""
+  return new Intl.DateTimeFormat(locale === "es" ? "es" : "pt-BR", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(event.start))
+}
+
+function remaining(iso: string | null) {
+  if (!iso) return "—"
+  const minutes = Math.floor((Date.parse(iso) - Date.now()) / 60000)
+  if (minutes <= 0) return "00h 00m"
+  const days = Math.floor(minutes / (60 * 24))
+  const hours = Math.floor((minutes % (60 * 24)) / 60)
+  if (days > 0) return `${days}d ${String(hours).padStart(2, "0")}h`
+  return `${String(hours).padStart(2, "0")}h ${String(minutes % 60).padStart(2, "0")}m`
 }
 
 const proPlayers = [
@@ -514,10 +600,12 @@ function Home({
   onNavigate,
   onOpenTournament,
   locale,
+  events,
 }: {
   onNavigate: (page: Page) => void
   onOpenTournament: (slug: string) => void
   locale: Locale
+  events: CatalogEvent[]
 }) {
   const t = messages[locale]
   return (
@@ -541,10 +629,15 @@ function Home({
               </h1>
               <p>{t.heroBody}</p>
               <div className="button-row">
-                <button className="primary-button large live-primary-cta">
+                <a
+                  className="primary-button large live-primary-cta"
+                  href={DISCORD_INVITE}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <DiscordMark className="discord-mark" />
                   {t.joinDiscord}
-                </button>
+                </a>
                 <button
                   className="secondary-button large live-secondary-cta"
                   onClick={() => onNavigate("leaderboard")}
@@ -627,10 +720,10 @@ function Home({
             </button>
           </div>
           <div className="live-event-list">
-            {[...tournaments].reverse().map((event) => (
+            {(events.some((event) => event.source === "database") ? events : [...events].reverse()).map((event) => (
               <button
                 className="live-event-row"
-                key={event.title}
+                key={event.slug}
                 onClick={() => onOpenTournament(event.slug)}
               >
                 <span className="live-event-thumb">
@@ -638,12 +731,12 @@ function Home({
                 </span>
                 <span className="live-event-copy">
                   <span className="live-event-kicker">
-                    <small>{t.statusSoon}</small>
-                    <em>{t[event.dateKey]}</em>
+                    <small>{statusLabel(event.status, t)}</small>
+                    <em>{eventDate(event, t, locale)}</em>
                   </span>
                   <strong>{event.title}</strong>
                   <span className="live-event-meta">
-                    <span>{event.mode} · Build · BR</span>
+                    <span>{event.teamSize} · {event.mode} · {event.region}</span>
                   </span>
                 </span>
                 <span className="live-event-status">
@@ -762,11 +855,23 @@ function Home({
               <p>{t.inviteBody}</p>
             </div>
             <div>
-              <button className="primary-button large">
+              <a
+                className="primary-button large"
+                href={DISCORD_INVITE}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <DiscordMark className="discord-mark" />
                 {t.joinDiscord}
-              </button>
-              <button>{t.inviteContact}</button>
+              </a>
+              <a
+                className="invite-contact"
+                href="https://www.majorscrims.com/contato?assunto=commercial"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t.inviteContact}
+              </a>
             </div>
           </div>
         </section>
@@ -779,10 +884,12 @@ function Tournaments({
   onNavigate,
   onOpenTournament,
   locale,
+  events,
 }: {
   onNavigate: (page: Page) => void
   onOpenTournament: (slug: string) => void
   locale: Locale
+  events: CatalogEvent[]
 }) {
   const t = messages[locale]
   return (
@@ -794,47 +901,47 @@ function Tournaments({
       </section>
 
       <section className="page-shell live-tournament-grid">
-        {tournaments.map((event) => (
+        {events.length === 0 ? (
+          <p>{t.noTournaments}</p>
+        ) : events.map((event) => {
+          const fill = occupancy(event)
+          return (
           <button
             className="live-tournament-card"
-            key={event.title}
+            key={event.slug}
             onClick={() => onOpenTournament(event.slug)}
           >
             <span className="live-tournament-art">
               {event.image && <img src={event.image} alt="" />}
-              <small>{t.statusSoon}</small>
+              <small>{statusLabel(event.status, t)}</small>
             </span>
             <span className="live-tournament-body">
-              {(() => {
-                const fill = tournamentFill(event.slug, event.capacity)
-                return (
                   <>
                     <span className="live-tournament-title-row">
                       <strong>{event.title}</strong>
-                      <span className="occupancy-track" aria-hidden>
-                        <span
-                          className={`occupancy-fill ${fill.level}`}
-                          style={{ width: `${fill.percent}%` }}
-                        />
+                      <span className="occupancy-side">
+                        <span className="occupancy-track" aria-hidden>
+                          <span
+                            className={`occupancy-fill ${fill.level}`}
+                            style={{ width: `${fill.percent}%` }}
+                          />
+                        </span>
+                        <b>{fill.percent}%</b>
                       </span>
                     </span>
                     <span>
+                      <small>{event.teamSize}</small>
                       <small>{event.mode}</small>
-                      <small>Build</small>
-                      <small>BR</small>
+                      <small>{event.region}</small>
                     </span>
                     <span className="occupancy-meta">
-                      <span>
-                        {fill.players}/{event.capacity} {t.occupancyPlayers}
-                      </span>
-                      <b>{fill.percent}%</b>
+                      {event.marked}/{event.roster} {t.occupancyPlayers}
                     </span>
                   </>
-                )
-              })()}
             </span>
           </button>
-        ))}
+          )
+        })}
       </section>
     </main>
   )
@@ -842,12 +949,14 @@ function Tournaments({
 
 function TournamentDetail({
   slug,
+  events,
   onNavigate,
   locale,
   signedIn,
   onLogin,
 }: {
   slug: string
+  events: CatalogEvent[]
   onNavigate: (page: Page) => void
   locale: Locale
   signedIn: boolean
@@ -855,10 +964,48 @@ function TournamentDetail({
 }) {
   const t = messages[locale]
   const mapCopy = eventMapCopy(locale)
-  const event = tournaments.find((item) => item.slug === slug) ?? tournaments[0]
-  const board = demoBoard(event.slug)
+  const event = events.find((item) => item.slug === slug) ?? events[0]
+  const mockBoard = demoBoard(event?.slug ?? slug)
+  const [live, setLive] = useState<{ mapImage: string; windows: LiveWindow[] } | null>(null)
+  const [windowId, setWindowId] = useState<string | null>(null)
   const [comments, setComments] = useState<string[]>([])
   const [draft, setDraft] = useState("")
+
+  useEffect(() => {
+    if (!event || event.source !== "database") {
+      setLive(null)
+      setWindowId(null)
+      return
+    }
+    let cancel = false
+    setLive(null)
+    fetch(`/api/tournaments/${encodeURIComponent(event.slug)}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (cancel || data?.source !== "database") return
+        setLive({ mapImage: data.mapImage, windows: data.windows ?? [] })
+        setWindowId(data.windows?.[0]?.id ?? null)
+      })
+      .catch(() => {})
+    return () => {
+      cancel = true
+    }
+  }, [event?.slug, event?.source])
+
+  if (!event) {
+    return (
+      <main className="inner-page page-shell">
+        <p>{t.noTournaments}</p>
+      </main>
+    )
+  }
+
+  const fromDatabase = event.source === "database"
+  const current = live?.windows.find((item) => item.id === windowId) ?? live?.windows[0] ?? null
+  const zones = current?.zones ?? (fromDatabase ? [] : mockBoard.zones)
+  const teams = current?.teams ?? (fromDatabase ? [] : mockBoard.teams)
+  const closesAt = current?.closesAt ?? (fromDatabase ? event.start : mockBoard.closesAt)
+  const windows = current ? live!.windows : [{ id: "finals", label: "Finals" }]
 
   return (
     <main className="event-page">
@@ -872,35 +1019,47 @@ function TournamentDetail({
           </button>
           <h1>{event.title}</h1>
           <div className="event-meta-line">
-            <span>{t[event.dateKey]}</span>
-            <i>·</i><span>{event.mode}</span><i>·</i><span>Build</span><i>·</i>
-            <span>BR</span><small>{t.statusSoonSoft}</small>
+            <span>{eventDate(event, t, locale)}</span>
+            <i>·</i><span>{event.teamSize}</span><i>·</i><span>{event.mode}</span><i>·</i>
+            <span>{event.region}</span><small>{statusLabel(event.status, t, true)}</small>
           </div>
         </div>
       </header>
 
       <div className="event-phase-bar">
-        <button className="active">Finals</button>
-        <span><i /> {t.closesIn} <b>16d 06h</b></span>
+        {windows.map((item) => (
+          <button
+            key={item.id}
+            className={item.id === (current?.id ?? "finals") ? "active" : undefined}
+            onClick={() => setWindowId(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+        <span><i /> {t.closesIn} <b>{remaining(closesAt)}</b></span>
       </div>
 
       <section className="event-wide-shell event-workspace">
+        {fromDatabase && !current ? (
+          <p>{t.mapLoading}</p>
+        ) : (
         <EventMap
-          key={`${event.slug}-${signedIn ? "signed-in" : "anon"}`}
+          key={`${event.slug}-${current?.id ?? "mock"}-${signedIn ? "signed-in" : "anon"}`}
           t={mapCopy}
           slug={event.slug}
-          windowId="finals"
-          mapImage="/images/mapa-br.png"
-          zones={board.zones}
-          teams={board.teams}
-          myKey={signedIn ? board.viewerKey : null}
-          canMark={signedIn}
-          isStaff={signedIn}
-          blockedReason={signedIn ? null : mapCopy.blockAnon}
-          highlights={board.highlights}
-          closesAt={board.closesAt}
-          closed={false}
+          windowId={current?.id ?? "finals"}
+          mapImage={live?.mapImage || "/images/mapa-br.png"}
+          zones={zones}
+          teams={teams}
+          myKey={fromDatabase ? null : signedIn ? mockBoard.viewerKey : null}
+          canMark={!fromDatabase && signedIn}
+          isStaff={!fromDatabase && signedIn}
+          blockedReason={fromDatabase || signedIn ? null : mapCopy.blockAnon}
+          highlights={fromDatabase ? {} : mockBoard.highlights}
+          closesAt={closesAt}
+          closed={current?.closed ?? false}
         />
+        )}
       </section>
 
       <section className="event-wide-shell event-comments">
@@ -1211,6 +1370,32 @@ function Dashboard({ locale }: { locale: Locale }) {
   )
 }
 
+function XIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden>
+      <path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.4L5.3 21H2.2l7.3-8.3L1.9 3h6.4l4.4 5.8L17.8 3Zm-1.1 16.2h1.7L7.4 4.7H5.6l11.1 14.5Z" />
+    </svg>
+  )
+}
+
+function InstagramIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden>
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.3" cy="6.7" r="1.1" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+function TikTokIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden>
+      <path d="M16.6 2h-3.4v13.3a2.9 2.9 0 1 1-2.1-2.8V9a6.3 6.3 0 1 0 5.5 6.3V8.6a8 8 0 0 0 4.7 1.5V6.7a4.7 4.7 0 0 1-4.7-4.7Z" />
+    </svg>
+  )
+}
+
 function Footer({ locale }: { locale: Locale }) {
   const t = messages[locale]
   return (
@@ -1220,16 +1405,36 @@ function Footer({ locale }: { locale: Locale }) {
           <Logo />
           <b>{t.founders}</b>
           <div>
-            <span><i>B</i><strong>@BLXCKOUTZ<small>Co-owner · BR</small></strong></span>
-            <span><i>G</i><strong>@GORILONFN<small>Co-owner · AR</small></strong></span>
+            <a href="https://x.com/blxckoutz" target="_blank" rel="noopener noreferrer">
+              <i>B</i><strong>@BLXCKOUTZ<small>Co-owner · BR</small></strong>
+            </a>
+            <a href="https://x.com/gorilonfn" target="_blank" rel="noopener noreferrer">
+              <i>G</i><strong>@GORILONFN<small>Co-owner · AR</small></strong>
+            </a>
           </div>
         </div>
         <div className="live-footer-contact">
-          <button>{t.contact} <ArrowRight size={14} /></button>
+          <a className="footer-contact" href="https://www.majorscrims.com/contato" target="_blank" rel="noopener noreferrer">
+            {t.contact} <ArrowRight size={14} />
+          </a>
           <div className="live-socials">
-            <span>X</span><span>IG</span><span>TK</span><span>DS</span>
+            <a href="https://x.com/MajorScrims_" target="_blank" rel="noopener noreferrer" aria-label="X" title="X">
+              <XIcon />
+            </a>
+            <a href="https://www.instagram.com/majorscrims/" target="_blank" rel="noopener noreferrer" aria-label="Instagram" title="Instagram">
+              <InstagramIcon />
+            </a>
+            <a href="https://www.tiktok.com/@majorscrims_" target="_blank" rel="noopener noreferrer" aria-label="TikTok" title="TikTok">
+              <TikTokIcon />
+            </a>
+            <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" aria-label="Discord" title="Discord">
+              <DiscordMark className="footer-discord" />
+            </a>
           </div>
-          <div><span>{t.privacy}</span><span>{t.terms}</span></div>
+          <div>
+            <a href="https://www.majorscrims.com/privacidade" target="_blank" rel="noopener noreferrer">{t.privacy}</a>
+            <a href={locale === "es" ? "https://www.majorscrims.com/termos?lang=es" : "https://www.majorscrims.com/termos?lang=pt"} target="_blank" rel="noopener noreferrer">{t.terms}</a>
+          </div>
           <small>{t.rights}</small>
         </div>
       </div>
@@ -1242,6 +1447,7 @@ export default function App() {
   const [locale, setLocale] = useState<Locale>("pt")
   const [signedIn, setSignedIn] = useState(false)
   const [eventSlug, setEventSlug] = useState("fncs-solo-finals1")
+  const [events, setEvents] = useState<CatalogEvent[]>(mockCatalog)
   const navigate = (target: Page) => {
     setPage(target)
     window.scrollTo({ top: 0, behavior: "smooth" })
@@ -1255,6 +1461,20 @@ export default function App() {
     document.documentElement.lang = locale === "es" ? "es" : "pt-BR"
   }, [locale])
 
+  useEffect(() => {
+    let cancel = false
+    fetch("/api/tournaments")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (cancel || data?.source !== "database" || !Array.isArray(data.tournaments)) return
+        setEvents(data.tournaments)
+      })
+      .catch(() => {})
+    return () => {
+      cancel = true
+    }
+  }, [])
+
   return (
     <div className="app">
       <AppHeader
@@ -1267,14 +1487,15 @@ export default function App() {
         onLogout={() => setSignedIn(false)}
       />
       {page === "home" && (
-        <Home onNavigate={navigate} onOpenTournament={openTournament} locale={locale} />
+        <Home onNavigate={navigate} onOpenTournament={openTournament} locale={locale} events={events} />
       )}
       {page === "tournaments" && (
-        <Tournaments onNavigate={navigate} onOpenTournament={openTournament} locale={locale} />
+        <Tournaments onNavigate={navigate} onOpenTournament={openTournament} locale={locale} events={events} />
       )}
       {page === "tournament" && (
         <TournamentDetail
           slug={eventSlug}
+          events={events}
           onNavigate={navigate}
           locale={locale}
           signedIn={signedIn}

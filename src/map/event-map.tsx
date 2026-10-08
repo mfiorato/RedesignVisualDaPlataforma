@@ -447,7 +447,7 @@ export function EventMap({
 
       <div className="flex flex-col gap-4 lg:flex-row">
         {/* ---------------- Lista de equipes ---------------- */}
-        <aside className={broadcast ? "hidden" : "order-2 flex max-h-[70vh] flex-col overflow-hidden rounded-xl border border-edge bg-ground-2 lg:order-1 lg:h-[calc(100vh-190px)] lg:max-h-none lg:min-h-[560px] lg:w-[380px] lg:shrink-0 xl:w-[430px]"}>
+        <aside className={broadcast ? "hidden" : "order-2 flex max-h-[70vh] flex-col overflow-hidden rounded-xl border border-edge bg-ground-2 lg:order-1 lg:h-[calc(100dvh-340px)] lg:max-h-[calc(100dvh-340px)] lg:min-h-[480px] lg:w-[380px] lg:shrink-0 xl:w-[430px]"}>
           <div className="flex flex-col gap-2.5 border-b border-edge bg-white/[0.02] px-3 py-3">
             <div className="flex items-baseline justify-between gap-3">
               <h2 className="font-display text-sm font-semibold text-ink">{t.teams}</h2>
@@ -567,7 +567,7 @@ export function EventMap({
           className={
             broadcast
               ? "fixed inset-0 z-50 min-w-0 overflow-hidden border-0 bg-[#08100b] [container-type:size]"
-              : "relative order-1 h-[min(94vw,78vh)] min-w-0 overflow-hidden rounded-xl border border-edge bg-[#08100b] [container-type:size] lg:order-2 lg:h-[calc(100vh-190px)] lg:min-h-[560px] lg:flex-1"
+              : "relative order-1 h-[min(94vw,70dvh)] min-w-0 overflow-hidden rounded-xl border border-edge bg-[#08100b] lg:order-2 lg:h-[calc(100dvh-340px)] lg:max-h-[calc(100dvh-340px)] lg:min-h-[480px] lg:flex-1"
           }
           aria-busy={pending}
           onPointerDown={(event) => {
@@ -614,15 +614,14 @@ export function EventMap({
             touchAction: scale > 1 || aim ? "none" : "auto",
           }}
         >
-          <div className="absolute inset-0 flex items-center justify-center">
-            {/* O mapa cabe inteiro no painel: a medida é o menor lado,
-                respeitando a proporção da imagem. */}
+          <div className="absolute inset-0 grid place-items-center p-3">
             <div
               ref={boxRef}
-              className="relative"
+              className="relative max-h-full max-w-full"
               style={{
-                width: `min(100cqw, calc(100cqh * ${aspect}))`,
                 aspectRatio: aspect,
+                height: "100%",
+                width: "auto",
               }}
             >
               <div

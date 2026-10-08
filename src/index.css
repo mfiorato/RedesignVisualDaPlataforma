@@ -86,7 +86,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--green); out
 .primary-button, .secondary-button {
   display: inline-flex; border: 0; align-items: center; justify-content: center; gap: 9px;
   min-height: 44px; padding: 0 20px; border-radius: 8px; font-weight: 800; font-size: 13px;
-  letter-spacing: .03em; text-transform: uppercase; transition: .2s ease;
+  letter-spacing: .03em; text-transform: uppercase; text-decoration: none; transition: .2s ease;
 }
 .primary-button { color: #07100a; background: var(--green); box-shadow: 0 0 0 transparent; }
 .primary-button:hover { background: #7ef0a6; transform: translateY(-1px); box-shadow: 0 10px 30px rgba(34, 217, 98, .16); }
@@ -378,6 +378,8 @@ h1, h2, h3, h4, button, .eyebrow { font-family: "Outfit", system-ui, sans-serif;
 .live-tournament-body > .live-tournament-title-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .live-tournament-title-row > strong { min-width: 0; font-size: 16px; }
 .live-tournament-title-row .occupancy-track { width: 118px; flex: 0 0 118px; }
+.occupancy-side { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.occupancy-side b { color: #fff; font-family: "Outfit", system-ui, sans-serif; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .live-tournament-body > span { display: flex; gap: 7px; }
 .live-tournament-body > .occupancy-meta { justify-content: space-between; gap: 12px; }
 .live-tournament-body small { padding: 5px 12px; color: #8a948c; border: 1px solid var(--line); border-radius: 99px; background: rgba(255,255,255,.035); font-size: 9px; }
@@ -829,7 +831,7 @@ h1, h2, h3, h4, button, .eyebrow { font-family: "Outfit", system-ui, sans-serif;
 .live-invite-card h2 { margin: 0 0 9px; font-size: 34px; }
 .live-invite-card p { max-width: 560px; margin: 0; color: #9ba59d; line-height: 1.55; }
 .live-invite-card > div:last-child { display: flex; align-items: flex-end; flex: 0 0 auto; flex-direction: column; gap: 11px; }
-.live-invite-card > div:last-child > button:last-child { padding: 0; color: #aab3ac; border: 0; border-bottom: 1px solid #657068; background: transparent; font-size: 10px; }
+.live-invite-card > div:last-child > .invite-contact { padding: 0; color: #aab3ac; border: 0; border-bottom: 1px solid #657068; background: transparent; font-size: 10px; text-decoration: none; }
 
 .live-leaderboard-page { padding-bottom: 90px; background: var(--ground); }
 .live-board-header { min-height: 170px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
@@ -861,16 +863,22 @@ h1, h2, h3, h4, button, .eyebrow { font-family: "Outfit", system-ui, sans-serif;
 .live-footer-founders strong { display: flex; flex-direction: column; font-size: 11px; }
 .live-footer-founders small { margin-top: 2px; color: #657068; font-size: 8px; font-weight: 400; }
 .live-footer-contact { display: flex; align-items: flex-end; flex-direction: column; gap: 14px; }
-.live-footer-contact > button { display: flex; align-items: center; gap: 8px; padding: 0; color: var(--green); border: 0; background: transparent; font-size: 11px; font-weight: 700; }
+.live-footer-contact > .footer-contact { display: flex; align-items: center; gap: 8px; padding: 0; color: var(--green); border: 0; background: transparent; font-size: 11px; font-weight: 700; text-decoration: none; }
 .live-socials { display: flex; gap: 7px; }
-.live-socials span { width: 39px; height: 39px; display: grid; place-items: center; color: #9da69f; border: 1px solid var(--line); border-radius: 8px; font-size: 9px; font-weight: 800; }
+.live-socials a { width: 39px; height: 39px; display: grid; place-items: center; color: #9da69f; border: 1px solid var(--line); border-radius: 8px; text-decoration: none; }
+.live-socials a:hover { color: var(--green); border-color: rgba(34,217,98,.5); }
+.footer-discord { width: 16px; height: 16px; }
+.live-footer-founders > div > a { display: flex; align-items: center; gap: 9px; padding: 6px 11px 6px 6px; color: inherit; text-decoration: none; border: 1px solid var(--line); border-radius: 8px; }
+.live-footer-founders > div > a:hover { border-color: rgba(34,217,98,.5); }
 .live-footer-contact > div:nth-child(3) { display: flex; gap: 18px; color: #616b63; font-size: 10px; }
+.live-footer-contact > div:nth-child(3) a { color: inherit; text-decoration: none; }
+.live-footer-contact > div:nth-child(3) a:hover { color: var(--green); }
 .live-footer-contact > small { color: #545e56; font-size: 10px; }
 
 .event-page { min-height: 100vh; padding-bottom: 90px; background: var(--ground); }
 .event-wide-shell { width: min(1392px, calc(100% - 48px)); margin-inline: auto; }
 .event-page-header { border-bottom: 1px solid var(--line); }
-.event-page-header .event-wide-shell { min-height: 195px; display: flex; align-items: flex-start; justify-content: center; flex-direction: column; }
+.event-page-header .event-wide-shell { min-height: 0; display: flex; align-items: flex-start; justify-content: center; flex-direction: column; padding-block: 28px 22px; }
 .event-back { padding: 0; margin-bottom: 18px; color: #727d74; border: 0; background: transparent; font-family: Inter, system-ui, sans-serif; font-size: 12px; }
 .event-back:hover { color: var(--green); }
 .event-page-header h1 { margin: 0 0 17px; font-size: 37px; line-height: 1; letter-spacing: -.025em; }
