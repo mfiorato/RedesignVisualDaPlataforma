@@ -705,48 +705,19 @@ function Home({
           </div>
         </section>
 
-        <section className="live-tournaments-section section page-shell">
-          <div>
-            <SectionTitle
-              eyebrow={t.tournamentsEyebrow}
-              title={t.tournamentsTitle}
-              body={t.tournamentsBody}
-            />
-            <button
-              className="live-section-link"
-              onClick={() => onNavigate("tournaments")}
-            >
-              {t.viewAllTournaments} <ArrowRight size={16} />
-            </button>
+        <div className="page-shell tutorial-block">
+          <div className="tutorial-copy">
+            <span className="tutorial-eyebrow">{t.tutorialEyebrow}</span>
+            <h2>{t.tutorialTitle}</h2>
+            <p>{t.tutorialCopy}</p>
           </div>
-          <div className="live-event-list">
-            {(events.some((event) => event.source === "database") ? events : [...events].reverse()).map((event) => (
-              <button
-                className="live-event-row"
-                key={event.slug}
-                onClick={() => onOpenTournament(event.slug)}
-              >
-                <span className="live-event-thumb">
-                  {event.image && <img src={event.image} alt="" />}
-                </span>
-                <span className="live-event-copy">
-                  <span className="live-event-kicker">
-                    <small>{statusLabel(event.status, t)}</small>
-                    <em>{eventDate(event, t, locale)}</em>
-                  </span>
-                  <strong>{event.title}</strong>
-                  <span className="live-event-meta">
-                    <span>{event.teamSize} · {event.mode} · {event.region}</span>
-                  </span>
-                </span>
-                <span className="live-event-status">
-                  <small>{t.viewMap}</small>
-                  <ArrowRight size={17} />
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
+          <TutorialPlayer
+            key={locale}
+            src={tutorialVideos[locale]}
+            label={t.tutorialLabel}
+            locale={locale}
+          />
+        </div>
 
         <section className="rank-section">
           <div className="page-shell live-rank-layout">
@@ -791,6 +762,22 @@ function Home({
         </section>
 
         <section className="page-shell live-community-section">
+          <div className="live-pros">
+            <span className="eyebrow">{t.prosEyebrow}</span>
+            <h2>{t.prosTitle}</h2>
+            <p>{t.prosBody}</p>
+            <div className="pro-marquee-wrap">
+              <div className="pro-marquee">
+                {[...proPlayers, ...proPlayers].map(([name, image], index) => (
+                  <figure key={`${name}-${index}`} aria-hidden={index >= proPlayers.length || undefined}>
+                    <img src={image} alt={index < proPlayers.length ? name : ""} />
+                    <figcaption><b>{name}</b><small>{t.proPlayer}</small></figcaption>
+                  </figure>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <div className="live-partners">
             <div>
               <span className="eyebrow">{t.partnersEyebrow}</span>
@@ -817,38 +804,52 @@ function Home({
               </button>
             </div>
           </div>
+        </section>
 
-          <div className="live-pros">
-            <span className="eyebrow">{t.prosEyebrow}</span>
-            <h2>{t.prosTitle}</h2>
-            <p>{t.prosBody}</p>
-            <div className="pro-marquee-wrap">
-              <div className="pro-marquee">
-                {[...proPlayers, ...proPlayers].map(([name, image], index) => (
-                  <figure key={`${name}-${index}`} aria-hidden={index >= proPlayers.length || undefined}>
-                    <img src={image} alt={index < proPlayers.length ? name : ""} />
-                    <figcaption><b>{name}</b><small>{t.proPlayer}</small></figcaption>
-                  </figure>
-                ))}
-              </div>
-            </div>
+        <section className="live-tournaments-section section page-shell">
+          <div>
+            <SectionTitle
+              eyebrow={t.tournamentsEyebrow}
+              title={t.tournamentsTitle}
+              body={t.tournamentsBody}
+            />
+            <button
+              className="live-section-link"
+              onClick={() => onNavigate("tournaments")}
+            >
+              {t.viewAllTournaments} <ArrowRight size={16} />
+            </button>
+          </div>
+          <div className="live-event-list">
+            {(events.some((event) => event.source === "database") ? events : [...events].reverse()).map((event) => (
+              <button
+                className="live-event-row"
+                key={event.slug}
+                onClick={() => onOpenTournament(event.slug)}
+              >
+                <span className="live-event-thumb">
+                  {event.image && <img src={event.image} alt="" />}
+                </span>
+                <span className="live-event-copy">
+                  <span className="live-event-kicker">
+                    <small>{statusLabel(event.status, t)}</small>
+                    <em>{eventDate(event, t, locale)}</em>
+                  </span>
+                  <strong>{event.title}</strong>
+                  <span className="live-event-meta">
+                    <span>{event.teamSize} · {event.mode} · {event.region}</span>
+                  </span>
+                </span>
+                <span className="live-event-status">
+                  <small>{t.viewMap}</small>
+                  <ArrowRight size={17} />
+                </span>
+              </button>
+            ))}
           </div>
         </section>
 
         <section className="live-invite-section">
-          <div className="page-shell tutorial-block">
-            <div className="tutorial-copy">
-              <span className="tutorial-eyebrow">{t.tutorialEyebrow}</span>
-              <h2>{t.tutorialTitle}</h2>
-              <p>{t.tutorialCopy}</p>
-            </div>
-            <TutorialPlayer
-              key={locale}
-              src={tutorialVideos[locale]}
-              label={t.tutorialLabel}
-              locale={locale}
-            />
-          </div>
           <div className="page-shell live-invite-card">
             <div>
               <h2>{t.inviteTitle}</h2>

@@ -653,7 +653,8 @@ h1, h2, h3, h4, button, .eyebrow { font-family: "Outfit", system-ui, sans-serif;
 }
 
 .tutorial-block {
-  margin-bottom: 56px;
+  margin-top: 72px;
+  margin-bottom: 8px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
