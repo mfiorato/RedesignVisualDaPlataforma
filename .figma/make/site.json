@@ -1,5 +1,9 @@
 {
+  "title": "Major Scrims",
   "description": "This platform enhances tournament management with a modernized frontend, providing users with an intuitive interface while retaining existing functionalities.",
+  "icons": {
+    "icon": "/images/rank-icons/legend-v2.png"
+  },
   "robots": {
     "index": false
   },
